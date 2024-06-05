@@ -1,6 +1,6 @@
 import os
 import pytest
-from typing import Any, Dict
+from typing import Any
 from install import Config, Bootstrap
 
 @pytest.mark.parametrize(
@@ -34,7 +34,7 @@ def test_config_badparams(bad_config):
     ({'custom_something': True}, {'custom_vars' : {'custom_something': True}}),
     ]
 )
-def test_config_override_fn(in_obj: Dict[str, Any], expected: Any):
+def test_config_override_fn(in_obj: dict[str, Any], expected: Any):
     config = Config()
     config._override_vars(in_obj)
     for k, v in in_obj.items():
@@ -43,14 +43,14 @@ def test_config_override_fn(in_obj: Dict[str, Any], expected: Any):
         else:
             assert config.__dict__[k] == expected[k]
 
-# @pytest.mark.parametrize(
-#     "in_env,expected",
-#     [
-#     ('PYTHON', '3.33'),
-#     ('OVERWRITE', True),
-#     ]
-# )
-# def test_env_override(in_env, expected):
-#     os.environ[f"INTEGRATIONS_{in_env}"] = str(expected)
-#     blah = Config()
-#     assert getattr(blah, str(in_env).lower()) == expected
+@pytest.mark.parametrize(
+    "in_env,expected",
+    [
+        ('PYTHON', '3.33'),
+        ('OVERWRITE', True),
+    ]
+)
+def test_env_override(in_env, expected):
+    os.environ[f"INTEGRATIONS_{in_env}"] = str(expected)
+    blah = Config()
+    assert getattr(blah, str(in_env).lower()) == expected

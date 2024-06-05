@@ -29,7 +29,8 @@ class Config:
     config_path: str | Path = Path.home() 
     config_dir: str = 'integrations'
     bootstrap_yaml: str | Path = Path("config.yml")
-    custom_yaml: str | Path = Path("custom_exec") / "custom.yml"
+    custom_path: str | Path = Path("custom_exec")
+    custom_yaml: str | Path =  custom_path / "custom.yml"
     custom_vars: dict[str, Any] = field(default_factory=dict)
     python: str | float = f'{sys.version_info.major}.{sys.version_info.minor}'
     #repos: list[dict[str, dict[str, Any]]] = None
@@ -169,6 +170,7 @@ class Config:
         self._chk_config_dir()
 
 # BOOTSTRAP STEPS
+# * Check for PROXY vars and nuke them if internal only environment
 # * Run the pre-bootstrap scripts (if needed)
 # * Write the config files in their locations
 # * Set up .venv
@@ -181,20 +183,22 @@ class Bootstrap:
         self.config = config
         self.int_dir :Path = self.config.config_path / self.config.config_dir
         self.venv_dir :Path = self.int_dir / '.venv'
-        self.activate_bin = self.venv_dir / self._activate_bin()
+        self.activate_bin = self.venv_dir / 'bin' / self._activate_bin()
 
-    def _chk_python_syntax(self, pyscript: str | Path) -> bool:
+    def _chk_python_compile(self, pyscript: str | Path) -> bool:
         try:
-            py_compile.compile(pyscript, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP)
+            py_compile.compile(pyscript, invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP, doraise=True)
         except py_compile.PyCompileError as err:
-            lg.error(f"Syntax error on file: {pyscript} : {err}")
+            lg.error(f"Compiling Error: {err}")
+            return False
+        except Exception as err:
             return False
         else:
             return True
 
     #TODO: Allowing running across all files without failing for validation
     def extract_scripts(self, script_dir: str | Path) -> list:
-        bad_scripts, valid_scripts = [], []
+        bad_compile, good_compile = [], []
         scripts_dir = Path(script_dir) if isinstance(script_dir, str) else script_dir
         if not scripts_dir.exists() or scripts_dir.is_file():
             lg.error(f"Directory: {scripts_dir} is not found")
@@ -204,23 +208,23 @@ class Bootstrap:
             fh = Path(fl)
             if fh.suffix.lower() == '.py': # Run only Python files
                 lg.info(f"Checking file: {fh} in {scripts_dir}")
-                if self._chk_python_syntax(fh):
-                    lg.info(f"File: {fh.absolute()} has no syntax errors")
-                    valid_scripts.append(fh)
+                if self._chk_python_compile(fh):
+                    good_compile.append(fh)
                 else:
-                    lg.error(f"File: {fh.absolute()} has syntax errors.")
-                    bad_scripts.append(fh)
+                    lg.error(f"File: {fh} failed to compile...")
+                    bad_compile.append(fh)
                     
-        if len(bad_scripts) > 0:
-            lg.error(f"Due to syntax error in Python scripts. Failing...")
+        if len(bad_compile) > 0:
+            lg.error(f"Due to syntax error in some Python scripts. Failing...")
             raise SyntaxError
         
-        return sorted(valid_scripts)
+        return sorted(good_compile)
 
     # Dangerous logic but there's no easy way around it to run internal specifics without a divergent codebases
     # Do not blindly trust things.  Validate the scripts you're running!
     # Shell = True makes it even more insecure.
     #subprocess.run([sys.executable, "-m", "pip", "install", pkg],
+
     def py_exec(self, args: str | Path | list, sh: bool = True) -> int:
         cmd = [sys.executable]
         if isinstance(args, (str, Path)):
@@ -252,24 +256,24 @@ class Bootstrap:
     #TODO: Add logic for checking if it's update 
     def create_dirs(self) -> bool:
         if self.int_dir.exists() and self.config.overwrite:
-            lg.warn(f"Integrations directory: {self.int_dir} exists and overwrite config is True. Deleting the old directory.")
+            lg.warning(f"Integrations directory: {self.int_dir} exists and overwrite config is True. Deleting the old directory.")
             try:
                 rmtree(self.int_dir)
             except Exception as err:
                 lg.error(err)
                 raise Exception
         elif self.int_dir.exists() and not self.config.overwrite:
-            lg.warn(f"Integrations directory: {self.int_dir} exists and overwrite is False. Running an update instead...")
+            lg.warning(f"Integrations directory: {self.int_dir} exists and overwrite is False. Running an update instead...")
             # logic for update here?
         else:
             try:
                 self.int_dir.mkdir(
-                    mode=711,
                     parents=True,
-                    exists_ok=False)
+                    exist_ok=False)
             except Exception as err:
                 lg.error(f"Failed to create directory due to: {err}")
                 raise
+            return True
     
     def _activate_bin(self, platform :str = sys.platform) -> str:
         return "Activate.ps1" if platform.startswith("win32") else 'activate'
@@ -280,15 +284,14 @@ class Bootstrap:
     def _post_bootstrap(self) -> None:
         pass
 
-        
     def _chk_pip(self, pkgs :str | list[str] = None, install :bool = False) -> bool:
         pkgs = [pkgs] if isinstance(pkgs, str) else pkgs
-        pkgs.insert(0, 'pip') # Always check for pip module first
+        pkgs.insert(0, 'pip') # Always check for pip module first and constantly out of paranoia
 
         for pkg in pkgs:
             spec = find_spec(pkg)
             if spec is None:
-                lg.warn(f"Required package: {pkg} is not installed. Will attempt installation...")
+                lg.warning(f"Required package: {pkg} is not installed. Will attempt installation...")
                 if install:
                     lg.debug(f"Attempting to install Python package: {pkg}")
                     self.pip_install(pkg)
