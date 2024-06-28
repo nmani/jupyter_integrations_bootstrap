@@ -6,10 +6,11 @@ import argparse
 import logging as lg
 import yaml
 import subprocess
+import keyring
 import venv
 import py_compile
 from shutil import rmtree
-from getpass import getuser
+from getpass import getuser, getpass
 from dataclasses import dataclass, field
 from importlib.util import find_spec
 from pathlib import Path, PosixPath, WindowsPath
@@ -25,7 +26,9 @@ lg.basicConfig(level=lg.DEBUG)
 @dataclass
 class Config:
     overwrite: str | bool = False
+    interactive: str | bool = False
     env_prefix: str = "INTEGRATIONS"
+    keyring: str = 'integrations'
     config_path: str | Path = Path.home() 
     config_dir: str = 'integrations'
     bootstrap_yaml: str | Path = Path("config.yml")
@@ -275,6 +278,19 @@ class Bootstrap:
                 raise
             return True
     
+    def getset_kpwd(self) -> str:
+        pwd = keyring.get_password(self.config.keyring, getuser)
+        
+        if not pwd:
+            lg.error("Null or no password was provided")
+            if self.config.interactive == False:
+                pwd = getpass("Input your password")
+                keyring.set_password(self.config.keyring, getuser(), pwd)
+
+            else:
+                lg.error("No password provided and interactive mode.")
+                sys.exit(1)
+    
     def _activate_bin(self, platform :str = sys.platform) -> str:
         return "Activate.ps1" if platform.startswith("win32") else 'activate'
 
@@ -308,6 +324,7 @@ class Bootstrap:
             self._venv_create()
 
     def _venv_create(self) -> None:
+        lg.info(f"Creating venv in folder: {self.venv_dir}")
         try:
             venv.create(
                 Path(self.venv_dir),
@@ -323,6 +340,10 @@ class Bootstrap:
 
     def _write_template(self) -> None:
         pass
+
+
+def main(args):
+    pass
 
 
 if __name__ == "__main__":
