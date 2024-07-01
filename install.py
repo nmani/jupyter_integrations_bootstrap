@@ -341,10 +341,61 @@ class Bootstrap:
     def _write_template(self) -> None:
         pass
 
+def config_run(args: argparse.Namespace) -> None:
+    list_config = args.list
+    try:
+        if args.bootstrap_yaml:
+            out_config = Config(bootstrap_yaml=args.bootstrap_yaml)
+        else:
+            out_config = Config()
+    except Exception as err:
+        raise(err)
+    else:
+        if list_config:
+            for k, v in out_config.__dict__.items():
+                print(f"Config: {k}  = {v}")
 
-def main(args):
+def custom_run(args: argparse.Namespace) -> None:
     pass
 
+def main(args: argparse.Namespace) -> None:
+    if args:
+        print(args)
+        match args.command:
+            case 'init':
+                pass
+            case 'config':
+                config_run(args)
+            case 'upgrade':
+                pass
+            case 'custom':
+                pass
+    else:
+        pass
+
+def parser_args() -> argparse.Namespace:
+    subparsers = parser.add_subparsers(title="subcommands", description="commands", dest="command")
+    init_parser = subparsers.add_parser("init", help="Initialize bootstrapper")
+    init_parser.add_argument('-f', '--bootstrap_yaml', action='store', help="Non-standard location configuration config.yml file")
+    init_parser.add_argument('--dry-run', action='store_true', help="Validate config and access checks first...")
+
+    config_parser = subparsers.add_parser("config", help="Check the bootstrap yaml (config.yml)")
+    config_parser.add_argument('-f', '--bootstrap_yaml', action='store', help="Non-standard location configuration config.yml file")
+    config_parser.add_argument('-l', '--list', action='store_true', help="List the configuration parameters")
+
+    update_parser = subparsers.add_parser("upgrade", help="Update Current Environment")
+    update_parser.add_argument('--clean_run', action='store_true', help="Updates current config (if appliciable) and reruns the bootstrapper.")
+
+    custom_runner = subparsers.add_parser("custom", help="Run custom code and logic")
+    custom_runner.add_argument('-l', '--list', action='store_true', help="List custom scripts available")
+    args = parser.parse_args()
+
+    # No args 
+    if not vars(args):
+        parser.print_help()
+        sys.exit(0)
+
+    return args
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -353,17 +404,5 @@ if __name__ == "__main__":
         epilog=f'Version {__VERSION__}'
     )
 
-    subparsers = parser.add_subparsers(title="subcommands", description="commands")
-    init_parser = subparsers.add_parser("init", help="Initialize bootstrapper")
-    init_parser.add_argument('--dry-run', action='store_true', help="Validate config and access checks first...")
-    init_parser.add_argument('--remake', action='store_true', help="Remake configuration from scratch")
-
-    config_parser = subparsers.add_parser("config", help="Check configuration files")
-    config_parser.add_argument('-c', '--chk_conf', action='store_true', help="Checks configuration files and outputs the config object")
-
-    update_parser = subparsers.add_parser("update", help="Update Current Environment")
-    update_parser.add_argument('-u', '--update', action='store_true', help="Updates current config (if appliciable) and reruns the bootstrapper.")
-
-    custom_runner = subparsers.add_parser("custom", help="Run custom code and logic")
-    update_parser.add_argument('-l', '--list', action='store_true', help="List custom scripts available")
-    args = parser.parse_args()
+    args = parser_args()
+    main(args)

@@ -37,7 +37,7 @@ def test_venv_create(bstrap: Bootstrap):
         ("import os; import pytest", True)
     ]
 )
-def test_bstrap_scripts(bstrap: Bootstrap, bad_program, expected):
+def test_bstrap_compile(bstrap: Bootstrap, bad_program, expected):
     outfile =  bstrap.config.config_path / "01_testing.py"
 
     with open(outfile, "w") as fh:
