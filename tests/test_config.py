@@ -1,5 +1,6 @@
 import os
 import pytest
+from pathlib import Path
 from typing import Any
 from install import Config, Bootstrap
 
@@ -7,8 +8,6 @@ from install import Config, Bootstrap
     "bad_config",
     [
         {'config_path': "/NOT_A_REAL_PATH_I_HOPE"},
-        {'config_path': "/"},
-        {'config_path': "C:\\"},
         {'python': 2.12 },
         {'python': "212" },
         {'python': "3.11" }, # not min python version

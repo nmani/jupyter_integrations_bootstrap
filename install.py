@@ -92,7 +92,8 @@ class Config:
             lg.error(f"Not a WindowsPath/PosixPath: {type(config_path)}")
             sys.exit(1)
             
-        assert config_path.owner() == getuser(), f"The config_path owner: {config_path.owner} does not match current owner: {os.getuid}"
+        if not sys.platform.startswith("win32"):
+            assert config_path.owner() == getuser(), f"The config_path owner: {config_path.owner} does not match current owner: {os.getuid}"
         assert config_path.absolute() != config_path.absolute().anchor, f"config_path: {config_path} is a OS root directory..."
         
     def _load_yaml(self, fl: str | Path) -> dict[str, Any]:
@@ -186,7 +187,7 @@ class Bootstrap:
         self.config = config
         self.int_dir :Path = self.config.config_path / self.config.config_dir
         self.venv_dir :Path = self.int_dir / '.venv'
-        self.activate_bin = self.venv_dir / 'bin' / self._activate_bin()
+        self.activate_bin = self.venv_dir /'bin' / self._activate_bin()
 
     def _chk_python_compile(self, pyscript: str | Path) -> bool:
         try:
@@ -234,9 +235,6 @@ class Bootstrap:
             cmd += [Path(args).absolute()]
         elif isinstance(args, list):
             cmd += args
-        else:
-            lg.error(f"Unexpected type for args: {type(args)} - {args}")
-            raise TypeError
 
         try:
             output: subprocess.CompletedProcess = \
@@ -291,8 +289,8 @@ class Bootstrap:
                 lg.error("No password provided and interactive mode.")
                 sys.exit(1)
     
-    def _activate_bin(self, platform :str = sys.platform) -> str:
-        return "Activate.ps1" if platform.startswith("win32") else 'activate'
+    def _activate_bin(self, platform :str = sys.platform) -> Path:
+        return Path("Scripts") / "Activate.ps1" if platform.startswith("win32") else Path('bin') / 'activate'
 
     def _pre_bootstrap(self) -> None:
         pass
@@ -341,7 +339,7 @@ class Bootstrap:
     def _write_template(self) -> None:
         pass
 
-def config_run(args: argparse.Namespace) -> None:
+def config_run(args: argparse.Namespace) -> Config:
     list_config = args.list
     try:
         if args.bootstrap_yaml:
@@ -354,6 +352,7 @@ def config_run(args: argparse.Namespace) -> None:
         if list_config:
             for k, v in out_config.__dict__.items():
                 print(f"Config: {k}  = {v}")
+        return out_config
 
 def custom_run(args: argparse.Namespace) -> None:
     pass
@@ -365,7 +364,9 @@ def main(args: argparse.Namespace) -> None:
             case 'init':
                 pass
             case 'config':
-                config_run(args)
+                conf = config_run(args)
+                btstrap = Bootstrap(conf)
+                custom_run(args)
             case 'upgrade':
                 pass
             case 'custom':
@@ -374,9 +375,9 @@ def main(args: argparse.Namespace) -> None:
         pass
 
 def parser_args() -> argparse.Namespace:
+    parser.add_argument('-f', '--bootstrap_yaml', action='store', help="Non-standard location configuration config.yml file")
     subparsers = parser.add_subparsers(title="subcommands", description="commands", dest="command")
     init_parser = subparsers.add_parser("init", help="Initialize bootstrapper")
-    init_parser.add_argument('-f', '--bootstrap_yaml', action='store', help="Non-standard location configuration config.yml file")
     init_parser.add_argument('--dry-run', action='store_true', help="Validate config and access checks first...")
 
     config_parser = subparsers.add_parser("config", help="Check the bootstrap yaml (config.yml)")

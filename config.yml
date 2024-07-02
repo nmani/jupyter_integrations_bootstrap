@@ -1,5 +1,0 @@
-#overwrite=True
-#env_prefix: "INTEGRATIONS"
-#python: 3.12
-#repos:
-#  - {"name": "integrations_base", "location": ""}
