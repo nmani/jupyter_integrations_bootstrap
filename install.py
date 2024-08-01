@@ -187,7 +187,7 @@ class Bootstrap:
         self.config = config
         self.int_dir :Path = self.config.config_path / self.config.config_dir
         self.venv_dir :Path = self.int_dir / '.venv'
-        self.activate_bin = self.venv_dir /'bin' / self._activate_bin()
+        self.activate_bin = self.venv_dir / self._activate_bin()
 
     def _chk_python_compile(self, pyscript: str | Path) -> bool:
         try:
